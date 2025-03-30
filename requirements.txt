@@ -1,6 +1,5 @@
 pydantic~=2.10.6
 duckdb~=1.2.1
-sqlalchemy~=2.0.39
 boto3~=1.37.18
 pydantic-settings~=2.8.1
 duckdb-engine~=0.15.0
