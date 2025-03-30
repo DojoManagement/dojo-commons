@@ -42,8 +42,8 @@ class TestDbService(unittest.TestCase):
         mock_conn = mock_connect.return_value
         table_name = "test_table"
         expected_query = (
-            f"CREATE TABLE IF NOT EXISTS ? AS SELECT * "
-            f"FROM read_csv_auto(?);"
+            "CREATE TABLE IF NOT EXISTS ? AS SELECT * "
+            "FROM read_csv_auto(?);"
         )
         path = f"s3://test-bucket/db/{table_name}.csv"
 
@@ -58,7 +58,7 @@ class TestDbService(unittest.TestCase):
     def test_persist_data(self, mock_connect):
         mock_conn = mock_connect.return_value
         table_name = "test_table"
-        expected_query = f"COPY ? TO ? " f"(FORMAT CSV, HEADER TRUE)"
+        expected_query = "COPY ? TO ? " f"(FORMAT CSV, HEADER TRUE)"
         path = f"s3://test-bucket/db/{table_name}.csv"
 
         db_service = DbService(AppConfiguration())  # type: ignore
