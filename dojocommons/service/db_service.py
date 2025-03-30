@@ -1,9 +1,6 @@
 import duckdb
-from sqlalchemy.orm import declarative_base
 
 from dojocommons.model.app_configuration import AppConfiguration
-
-Base = declarative_base()
 
 
 class DbService:
@@ -33,6 +30,11 @@ class DbService:
             )
 
     def create_table_from_csv(self, table_name: str):
+        """
+        Create a table in DuckDB from a CSV file stored in S3.
+        :param table_name: the name of the table to create
+        :return: the object with the result of the query execution
+        """
         query = (
             "CREATE TABLE IF NOT EXISTS ? AS SELECT * "
             "FROM read_csv_auto(?);"
@@ -41,14 +43,31 @@ class DbService:
         return self.execute_query(query, (table_name, file_path))
 
     def persist_data(self, table_name: str):
+        """
+        Persist data from a DuckDB table to a CSV file in S3.
+        :param table_name: the name of the table to persist
+        :return: the object with the result of the query execution
+        """
         query = "COPY ? TO ? (FORMAT CSV, HEADER TRUE)"
         file_path = f"{self._app_cfg.s3_file_path}/{table_name}.csv"
         return self.execute_query(query, (table_name, file_path))
 
     def execute_query(self, query: str, params: tuple = None):
+        """
+        Execute a query on the DuckDB connection.
+        :param query: the SQL query to execute.
+        :param params: the params of a prepared statement.
+        :return: the object with the result of the query execution.
+        """
         if params is None:
             return self._conn.execute(query)
         return self._conn.execute(query, params)
 
     def close_connection(self):
+        """
+        Close the duckdb connection.
+        """
+        """
+        :return: 
+        """
         self._conn.close()
