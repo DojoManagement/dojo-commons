@@ -1,7 +1,7 @@
 import http
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class BaseEvent(BaseModel):
