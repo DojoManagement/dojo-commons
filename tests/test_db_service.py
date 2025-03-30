@@ -28,12 +28,12 @@ class TestDbService(unittest.TestCase):
         self.assertEqual(
             [
                 call("INSTALL httpfs; LOAD httpfs;"),
-                call("SET s3_region='us-east-1';"),
-                call("SET s3_access_key_id='test_access_key';"),
-                call("SET s3_secret_access_key='test_secret_key';"),
+                call("SET s3_region=?;", ("us-east-1",)),
+                call("SET s3_access_key_id=?;", ("test_access_key",)),
+                call("SET s3_secret_access_key=?;", ("test_secret_key",)),
                 call("SET s3_url_style='path';"),
                 call("SET s3_use_ssl=false;"),
-                call("SET s3_endpoint='http://localhost:9000';"),
+                call("SET s3_endpoint=?;", ("http://localhost:9000",)),
             ],
             mock_conn.execute.call_args_list,
         )
@@ -42,27 +42,32 @@ class TestDbService(unittest.TestCase):
         mock_conn = mock_connect.return_value
         table_name = "test_table"
         expected_query = (
-            f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * "
-            f"FROM read_csv_auto('s3://test-bucket/db/{table_name}.csv');"
+            f"CREATE TABLE IF NOT EXISTS ? AS SELECT * "
+            f"FROM read_csv_auto(?);"
         )
+        path = f"s3://test-bucket/db/{table_name}.csv"
 
         db_service = DbService(AppConfiguration())  # type: ignore
 
         db_service.create_table_from_csv(table_name)
-        self.assertEqual(call(expected_query), mock_conn.execute.call_args)
+        self.assertEqual(
+            call(expected_query, (table_name, path)),
+            mock_conn.execute.call_args,
+        )
 
     def test_persist_data(self, mock_connect):
         mock_conn = mock_connect.return_value
         table_name = "test_table"
-        expected_query = (
-            f"COPY {table_name} TO 's3://test-bucket/db/{table_name}.csv' "
-            f"(FORMAT CSV, HEADER TRUE)"
-        )
+        expected_query = f"COPY ? TO ? " f"(FORMAT CSV, HEADER TRUE)"
+        path = f"s3://test-bucket/db/{table_name}.csv"
 
         db_service = DbService(AppConfiguration())  # type: ignore
         db_service.persist_data(table_name)
 
-        self.assertEqual(call(expected_query), mock_conn.execute.call_args)
+        self.assertEqual(
+            call(expected_query, (table_name, path)),
+            mock_conn.execute.call_args,
+        )
 
     def test_execute_query(self, mock_connect):
         mock_conn = mock_connect.return_value

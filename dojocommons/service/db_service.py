@@ -17,37 +17,33 @@ class DbService:
 
     def _init_duckdb(self):
         self._conn.execute("INSTALL httpfs; LOAD httpfs;")
-        self._conn.execute(f"SET s3_region='{self._app_cfg.aws_region}';")
-
+        self._conn.execute("SET s3_region=?;", (self._app_cfg.aws_region,))
         if self._app_cfg.aws_endpoint is not None:
             self._conn.execute(
-                f"SET s3_access_key_id='{self._app_cfg.aws_access_key_id}';"
+                "SET s3_access_key_id=?;", (self._app_cfg.aws_access_key_id,)
             )
             self._conn.execute(
-                f"SET s3_secret_access_key="
-                f"'{self._app_cfg.aws_secret_access_key}';"
+                "SET s3_secret_access_key=?;",
+                (self._app_cfg.aws_secret_access_key,),
             )
             self._conn.execute("SET s3_url_style='path';")
             self._conn.execute("SET s3_use_ssl=false;")
             self._conn.execute(
-                f"SET s3_endpoint='{self._app_cfg.aws_endpoint}';"
+                "SET s3_endpoint=?;", (self._app_cfg.aws_endpoint,)
             )
 
     def create_table_from_csv(self, table_name: str):
         query = (
-            f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * "
-            f"FROM read_csv_auto('{self._app_cfg.s3_file_path}/{table_name}.csv');"
+            "CREATE TABLE IF NOT EXISTS ? AS SELECT * "
+            "FROM read_csv_auto(?);"
         )
-
-        return self.execute_query(query)
+        file_path = f"{self._app_cfg.s3_file_path}/{table_name}.csv"
+        return self.execute_query(query, (table_name, file_path))
 
     def persist_data(self, table_name: str):
-        query = (
-            f"COPY {table_name} TO '{self._app_cfg.s3_file_path}/{table_name}.csv' "
-            f"(FORMAT CSV, HEADER TRUE)"
-        )
-
-        return self.execute_query(query)
+        query = "COPY ? TO ? (FORMAT CSV, HEADER TRUE)"
+        file_path = f"{self._app_cfg.s3_file_path}/{table_name}.csv"
+        return self.execute_query(query, (table_name, file_path))
 
     def execute_query(self, query: str, params: tuple = None):
         if params is None:
