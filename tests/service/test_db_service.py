@@ -101,6 +101,7 @@ class TestDbService(unittest.TestCase):
     def test_delete_class(self, mock_connect):
         mock_conn = mock_connect.return_value
 
+        # noinspection PyUnusedLocal
         db_service = DbService(AppConfiguration())  # type: ignore
 
         del db_service

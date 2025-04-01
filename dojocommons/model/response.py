@@ -1,11 +1,12 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class Response(BaseModel):
     status_code: int = Field(alias="statusCode")
     body: Optional[str]
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )

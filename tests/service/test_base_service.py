@@ -1,25 +1,9 @@
 import unittest
-from typing import Optional
 from unittest.mock import Mock, call
 
-from pydantic import BaseModel
-
 from dojocommons.model.app_configuration import AppConfiguration
-from dojocommons.repository.base_repository import BaseRepository
 from dojocommons.service.base_service import BaseService
-
-
-# Modelo de exemplo
-class User(BaseModel):
-    id: Optional[int] = None
-    name: str
-    email: str
-
-
-# Repositório de exemplo
-class UserRepository(BaseRepository[User]):
-    def __init__(self, cfg: AppConfiguration):
-        super().__init__(cfg, User, "users")
+from tests import UserRepository, User
 
 
 class TestBaseService(unittest.TestCase):
