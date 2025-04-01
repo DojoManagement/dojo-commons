@@ -73,6 +73,17 @@ class TestBaseController(unittest.TestCase):
         self.assertIn("items", response.body)
         self.assertTrue(self.mock_service().list_all.called)
 
+    def test_get_resource_not_found(self):
+        # Mock do evento GET para um recurso inexistente
+        event = MagicMock(spec=BaseEvent)
+        event.http_method = HTTPMethod.GET
+        event.resource = "non_existent_resource"
+
+        response = self.controller.dispatch(event)
+
+        self.assertEqual(404, response.status_code)
+        self.assertEqual("Resource not Found", response.body)
+
     def test_get_by_id(self):
         # Mock do evento GET para buscar por ID
         event = MagicMock(spec=BaseEvent)
