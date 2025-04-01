@@ -67,7 +67,4 @@ class DbService:
         """
         Close the duckdb connection.
         """
-        """
-        :return: 
-        """
         self._conn.close()

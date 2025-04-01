@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch, Mock, call
 
 from pydantic import BaseModel
 
-from dojocommons.controller.base_controller import BaseController, T
+from dojocommons.controller.base_controller import BaseController
 from dojocommons.model.app_configuration import AppConfiguration
 from dojocommons.model.base_event import BaseEvent
 from tests import UserRepository, UserService, UserResource, User
