@@ -44,7 +44,7 @@ class TestBaseController(unittest.TestCase):
         self.assertEqual(call(self.cfg), self.mock_service.call_args)
         self.assertEqual(self.mock_service.return_value, controller._service)
         self.assertEqual(self.mock_resource, controller._resource)
-        self.assertEqual(self.mock_model, controller._mock_model)
+        self.assertEqual(self.mock_model, controller._model_class)
 
     def test_dispatch_method_not_allowed(self):
         # Evento com método HTTP não suportado
