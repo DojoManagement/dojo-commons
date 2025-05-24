@@ -38,18 +38,18 @@ class TestDbService(unittest.TestCase):
             mock_conn.execute.call_args_list,
         )
 
-    def test_create_table_from_csv(self, mock_connect):
+    def test_create_table_from_parquet(self, mock_connect):
         mock_conn = mock_connect.return_value
         table_name = "test_table"
         expected_query = (
             "CREATE TABLE IF NOT EXISTS ? AS SELECT * "
-            "FROM read_csv_auto(?);"
+            "FROM read_parquet(?);"
         )
-        path = f"s3://test-bucket/db/{table_name}.csv"
+        path = f"s3://test-bucket/db/{table_name}.parquet"
 
         db_service = DbService(AppConfiguration())  # type: ignore
 
-        db_service.create_table_from_csv(table_name)
+        db_service.create_table_from_parquet(table_name)
         self.assertEqual(
             call(expected_query, (table_name, path)),
             mock_conn.execute.call_args,
@@ -58,8 +58,8 @@ class TestDbService(unittest.TestCase):
     def test_persist_data(self, mock_connect):
         mock_conn = mock_connect.return_value
         table_name = "test_table"
-        expected_query = "COPY ? TO ? (FORMAT CSV, HEADER TRUE)"
-        path = f"s3://test-bucket/db/{table_name}.csv"
+        expected_query = "COPY ? TO ? (FORMAT PARQUET, COMPRESSION ZSTD)"
+        path = f"s3://test-bucket/db/{table_name}.parquet"
 
         db_service = DbService(AppConfiguration())  # type: ignore
         db_service.persist_data(table_name)

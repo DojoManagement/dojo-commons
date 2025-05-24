@@ -33,12 +33,12 @@ class TestBaseController(unittest.TestCase):
         self.mock_model = Mock(spec=User)
 
         self.controller = BaseController(
-            self.cfg, self.mock_service, self.mock_resource, self.mock_model  # type: ignore
+            self.cfg, self.mock_service, self.mock_resource, self.mock_model
         )
 
     def test_ctor(self):
         controller = BaseController(
-            self.cfg, self.mock_service, self.mock_resource, self.mock_model  # type: ignore
+            self.cfg, self.mock_service, self.mock_resource, self.mock_model
         )
 
         self.assertEqual(call(self.cfg), self.mock_service.call_args)
@@ -93,7 +93,7 @@ class TestBaseController(unittest.TestCase):
 
         # Mock do retorno do serviço
         self.mock_service().get_by_id.return_value = MagicMock(
-            model_dump_json=lambda exclude_none: '{"id": 1, "name": "Test Entity"}'
+            model_dump_json=lambda **kwargs: '{"id": 1, "name": "Test Entity"}'
         )
 
         response = self.controller.dispatch(event)
