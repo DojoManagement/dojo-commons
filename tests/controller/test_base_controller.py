@@ -1,13 +1,13 @@
 import unittest
 from http import HTTPMethod
-from unittest.mock import MagicMock, patch, Mock, call
+from unittest.mock import MagicMock, Mock, call, patch
 
 from pydantic import BaseModel
 
 from dojocommons.controller.base_controller import BaseController
 from dojocommons.model.app_configuration import AppConfiguration
 from dojocommons.model.base_event import BaseEvent
-from tests import UserRepository, UserService, UserResource, User
+from tests import User, UserRepository, UserResource, UserService
 
 
 class MockModel(BaseModel):
@@ -33,12 +33,18 @@ class TestBaseController(unittest.TestCase):
         self.mock_model = Mock(spec=User)
 
         self.controller = BaseController(
-            self.cfg, self.mock_service, self.mock_resource, self.mock_model  # type: ignore
+            self.cfg,
+            self.mock_service,
+            self.mock_resource,
+            self.mock_model,  # type: ignore
         )
 
     def test_ctor(self):
         controller = BaseController(
-            self.cfg, self.mock_service, self.mock_resource, self.mock_model  # type: ignore
+            self.cfg,
+            self.mock_service,
+            self.mock_resource,
+            self.mock_model,  # type: ignore
         )
 
         self.assertEqual(call(self.cfg), self.mock_service.call_args)
@@ -91,9 +97,12 @@ class TestBaseController(unittest.TestCase):
         event.resource = f"{self.mock_resource}_ID"
         event.path_parameters = {"id": "1"}
 
+        def f(exclude_none):
+            return {"id": 1, "name": "Test Entity"}
+
         # Mock do retorno do serviço
         self.mock_service().get_by_id.return_value = MagicMock(
-            model_dump_json=lambda exclude_none: '{"id": 1, "name": "Test Entity"}'
+            model_dump_json=f,
         )
 
         response = self.controller.dispatch(event)
