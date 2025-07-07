@@ -1,6 +1,10 @@
+import datetime
 import os
 import unittest
-from unittest.mock import patch, call
+from unittest.mock import call, patch
+
+import duckdb
+from pydantic import BaseModel
 
 from dojocommons.model.app_configuration import AppConfiguration
 from dojocommons.service.db_service import DbService
@@ -41,17 +45,17 @@ class TestDbService(unittest.TestCase):
     def test_create_table_from_parquet(self, mock_connect):
         mock_conn = mock_connect.return_value
         table_name = "test_table"
-        expected_query = (
-            "CREATE TABLE IF NOT EXISTS ? AS SELECT * "
-            "FROM read_parquet(?);"
-        )
         path = f"s3://test-bucket/db/{table_name}.parquet"
+        expected_query = (
+            f"CREATE TABLE IF NOT EXISTS {table_name}"
+            f" AS SELECT * FROM read_parquet('{path}');"
+        )
 
         db_service = DbService(AppConfiguration())  # type: ignore
 
         db_service.create_table_from_parquet(table_name)
         self.assertEqual(
-            call(expected_query, (table_name, path)),
+            call(expected_query),
             mock_conn.execute.call_args,
         )
 
@@ -106,6 +110,54 @@ class TestDbService(unittest.TestCase):
 
         del db_service
         self.assertTrue(mock_conn.close.called)
+
+    @patch.object(DbService, "create_table_from_model")
+    @patch.object(DbService, "create_table_from_parquet")
+    def test_create_table_fallbacks_to_model(
+        self, mock_create_parquet, mock_create_model, _
+    ):
+        class DummyModel(BaseModel):
+            id: int
+            name: str
+
+        db_service = DbService(AppConfiguration())  # type: ignore
+
+        # Mock methods
+        mock_create_parquet.side_effect = duckdb.IOException("fail")
+
+        db_service.create_table(DummyModel, "dummy_table")
+
+        self.assertEqual(
+            call("dummy_table"),
+            mock_create_parquet.call_args,
+        )
+        self.assertEqual(
+            call(DummyModel),
+            mock_create_model.call_args,
+        )
+
+    def test_create_table_from_model_executes_sql(self, mock_connect):
+        mock_conn = mock_connect.return_value
+
+        class DummyModel(BaseModel):
+            id: int
+            name: str
+            created_at: datetime.datetime
+
+        db_service = DbService(AppConfiguration())  # type: ignore
+
+        # Mock execute_query
+        db_service.create_table_from_model(DummyModel)
+
+        self.assertEqual(
+            call(
+                "CREATE TABLE dummymodel (\n"
+                "    id INTEGER NOT NULL PRIMARY KEY,\n"
+                "    name TEXT NOT NULL,\n"
+                "    created_at TIMESTAMP NOT NULL\n);"
+            ),
+            mock_conn.execute.call_args,
+        )
 
 
 if __name__ == "__main__":

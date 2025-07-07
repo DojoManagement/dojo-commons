@@ -1,6 +1,8 @@
 import duckdb
+from pydantic import BaseModel
 
 from dojocommons.model.app_configuration import AppConfiguration
+from dojocommons.util.model_util import ModelUtil
 
 
 class DbService:
@@ -26,6 +28,30 @@ class DbService:
             self._conn.execute("SET s3_use_ssl=false;")
             self._conn.execute("SET s3_endpoint=?;", (self._app_cfg.aws_endpoint,))
 
+    def create_table(self, class_type: type[BaseModel], table_name: str | None = None):
+        """
+        Cria uma tabela DuckDB a partir de um modelo Pydantic.
+        :param class_type: Modelo Pydantic que define a estrutura da tabela.
+        :param table_name: Nome da tabela a ser criada. Se não fornecido, usa o nome da classe.
+        :return: Resultado da execução da consulta.
+        """
+        if table_name is None:
+            table_name = class_type.__name
+
+        try:
+            self.create_table_from_parquet(table_name)
+        except duckdb.IOException:
+            self.create_table_from_model(class_type)
+
+    def create_table_from_model(self, class_type: type[BaseModel]):
+        """
+        Cria uma tabela DuckDB a partir de um modelo Pydantic.
+        :param class_type: Modelo Pydantic que define a estrutura da tabela.
+        :return: Resultado da execução da consulta.
+        """
+        query = ModelUtil.generate_create_table_sql(class_type)
+        self.execute_query(query)
+
     def create_table_from_parquet(self, table_name: str):
         """
         Cria uma tabela no DuckDB a partir de um arquivo Parquet armazenado
@@ -38,7 +64,7 @@ class DbService:
             f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * "
             f"FROM read_parquet('{file_path}');"
         )
-        return self.execute_query(query)
+        self.execute_query(query)
 
     def persist_data(self, table_name: str):
         """
