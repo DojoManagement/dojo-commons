@@ -1,4 +1,5 @@
 import duckdb
+
 from dojocommons.model.app_configuration import AppConfiguration
 
 
@@ -15,14 +16,15 @@ class DbService:
         self._conn.execute("INSTALL httpfs; LOAD httpfs;")
         self._conn.execute("SET s3_region=?;", (self._app_cfg.aws_region,))
         if self._app_cfg.aws_endpoint is not None:
-            self._conn.execute("SET s3_access_key_id=?;",
-                               (self._app_cfg.aws_access_key_id,))
-            self._conn.execute("SET s3_secret_access_key=?;",
-                               (self._app_cfg.aws_secret_access_key,))
+            self._conn.execute(
+                "SET s3_access_key_id=?;", (self._app_cfg.aws_access_key_id,)
+            )
+            self._conn.execute(
+                "SET s3_secret_access_key=?;", (self._app_cfg.aws_secret_access_key,)
+            )
             self._conn.execute("SET s3_url_style='path';")
             self._conn.execute("SET s3_use_ssl=false;")
-            self._conn.execute("SET s3_endpoint=?;",
-                               (self._app_cfg.aws_endpoint,))
+            self._conn.execute("SET s3_endpoint=?;", (self._app_cfg.aws_endpoint,))
 
     def create_table_from_parquet(self, table_name: str):
         """
@@ -31,12 +33,12 @@ class DbService:
         :param table_name: Nome da tabela a ser criada.
         :return: Resultado da execução da consulta.
         """
-        query = (
-            "CREATE TABLE IF NOT EXISTS ? AS SELECT * "
-            "FROM read_parquet(?);"
-        )
         file_path = f"{self._app_cfg.s3_file_path}/{table_name}.parquet"
-        return self.execute_query(query, (table_name, file_path))
+        query = (
+            f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * "
+            f"FROM read_parquet('{file_path}');"
+        )
+        return self.execute_query(query)
 
     def persist_data(self, table_name: str):
         """
