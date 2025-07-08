@@ -1,6 +1,7 @@
-from typing import Generic, TypeVar, Type, List, Optional
-from dojocommons.service.db_service import DbService
+from typing import Generic, List, Optional, Type, TypeVar
+
 from dojocommons.model.app_configuration import AppConfiguration
+from dojocommons.service.db_service import DbService
 
 # Define um TypeVar para representar o tipo genérico
 T = TypeVar("T")
@@ -107,6 +108,14 @@ class BaseRepository(Generic[T]):
         self._db = DbService(cfg)
         self._model = model
         self._table_name = table_name
+        self._db.create_table(model, table_name)
+
+    def __del__(self):
+        """
+        Método destrutor para garantir que a conexão com o banco de dados
+        seja fechada quando o repositório for destruído.
+        """
+        self._db.persist_data(self._table_name)
 
     def create(self, entity: T) -> T:
         """
@@ -117,18 +126,13 @@ class BaseRepository(Generic[T]):
         :rtype: T
         """
         # Filtra as colunas e valores para ignorar os que são None
-        filtered_data = {
-            k: v for k, v in entity.__dict__.items() if v is not None
-        }
+        filtered_data = {k: v for k, v in entity.__dict__.items() if v is not None}
 
         columns = ", ".join(filtered_data.keys())
         placeholders = ", ".join(["?"] * len(filtered_data))
         values = tuple(filtered_data.values())
 
-        query = (
-            f"INSERT INTO {self._table_name} ({columns})"
-            f" VALUES ({placeholders})"
-        )
+        query = f"INSERT INTO {self._table_name} ({columns}) VALUES ({placeholders})"
         self._db.execute_query(query, values)
         return entity
 
@@ -159,9 +163,7 @@ class BaseRepository(Generic[T]):
          no banco de dados.
         :rtype: List[T]
         """
-        rows = self._db.execute_query(
-            f"SELECT * FROM {self._table_name}"
-        ).fetchall()
+        rows = self._db.execute_query(f"SELECT * FROM {self._table_name}").fetchall()
         return [
             self._model.model_validate(
                 dict(zip(self._model.__annotations__.keys(), row))
