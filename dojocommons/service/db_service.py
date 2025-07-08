@@ -36,7 +36,7 @@ class DbService:
         :return: Resultado da execução da consulta.
         """
         if table_name is None:
-            table_name = class_type.__name
+            table_name = class_type.__name__.lower()
 
         try:
             self.create_table_from_parquet(table_name)
@@ -72,9 +72,10 @@ class DbService:
         :param table_name: Nome da tabela a ser persistida.
         :return: Resultado da execução da consulta.
         """
-        query = "COPY ? TO ? (FORMAT PARQUET, COMPRESSION ZSTD)"
         file_path = f"{self._app_cfg.s3_file_path}/{table_name}.parquet"
-        return self.execute_query(query, (table_name, file_path))
+        query = f"COPY {table_name} TO '{file_path}'"
+        query += " (FORMAT PARQUET, COMPRESSION ZSTD)"
+        return self.execute_query(query)
 
     def execute_query(self, query: str, params: tuple = None):
         """
