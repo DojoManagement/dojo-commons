@@ -62,14 +62,16 @@ class TestDbService(unittest.TestCase):
     def test_persist_data(self, mock_connect):
         mock_conn = mock_connect.return_value
         table_name = "test_table"
-        expected_query = "COPY ? TO ? (FORMAT PARQUET, COMPRESSION ZSTD)"
         path = f"s3://test-bucket/db/{table_name}.parquet"
+        expected_query = (
+            f"COPY {table_name} TO '{path}' (FORMAT PARQUET, COMPRESSION ZSTD)"
+        )
 
         db_service = DbService(AppConfiguration())  # type: ignore
         db_service.persist_data(table_name)
 
         self.assertEqual(
-            call(expected_query, (table_name, path)),
+            call(expected_query),
             mock_conn.execute.call_args,
         )
 
