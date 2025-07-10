@@ -48,7 +48,9 @@ class BaseEvent(BaseModel):
             http.HTTPMethod.PUT,
             http.HTTPMethod.DELETE,
         }:
-            if not self.path_parameters or not self.path_parameters.get("id"):
+            if "id" in self.resource and (
+                not self.path_parameters or not self.path_parameters.get("id")
+            ):
                 raise ValueError(
                     "Parâmetro 'id' é obrigatório para as operações GET, PUT e DELETE."
                 )

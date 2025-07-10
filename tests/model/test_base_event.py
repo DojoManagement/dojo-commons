@@ -1,5 +1,6 @@
-import unittest
 import http
+import unittest
+
 from pydantic import ValidationError
 
 from dojocommons.model.base_event import BaseEvent
@@ -8,7 +9,7 @@ from dojocommons.model.base_event import BaseEvent
 class TestEventModel(unittest.TestCase):
     def test_valid_event_get(self):
         event_data = {
-            "resource": "/example",
+            "resource": "/example/{id}",
             "httpMethod": "GET",
             "headers": {"Content-Type": "application/json"},
             "queryStringParameters": {"key": "value"},
@@ -16,11 +17,28 @@ class TestEventModel(unittest.TestCase):
             "body": None,
         }
         event = BaseEvent.model_validate(event_data)
-        self.assertEqual("/example", event.resource)
+        self.assertEqual("/example/{id}", event.resource)
         self.assertEqual(http.HTTPMethod.GET, event.http_method)
         self.assertEqual({"Content-Type": "application/json"}, event.headers)
         self.assertEqual({"key": "value"}, event.query_parameters)
         self.assertEqual({"id": "123"}, event.path_parameters)
+        self.assertIsNone(event.body)
+
+    def test_valid_event_get_no_id(self):
+        event_data = {
+            "resource": "/example",
+            "httpMethod": "GET",
+            "headers": {"Content-Type": "application/json"},
+            "queryStringParameters": {"key": "value"},
+            "pathParameters": None,
+            "body": None,
+        }
+        event = BaseEvent.model_validate(event_data)
+        self.assertEqual("/example", event.resource)
+        self.assertEqual(http.HTTPMethod.GET, event.http_method)
+        self.assertEqual({"Content-Type": "application/json"}, event.headers)
+        self.assertEqual({"key": "value"}, event.query_parameters)
+        self.assertIsNone(event.path_parameters)
         self.assertIsNone(event.body)
 
     def test_invalid_http_method(self):
@@ -34,9 +52,7 @@ class TestEventModel(unittest.TestCase):
         }
         with self.assertRaises(ValidationError) as context:
             BaseEvent.model_validate(event_data)
-        self.assertIn(
-            "Método HTTP 'OPTIONS' não é válido", str(context.exception)
-        )
+        self.assertIn("Método HTTP 'OPTIONS' não é válido", str(context.exception))
 
     def test_missing_body_for_post(self):
         event_data = {
@@ -56,7 +72,7 @@ class TestEventModel(unittest.TestCase):
 
     def test_missing_path_parameters_for_get(self):
         event_data = {
-            "resource": "/example",
+            "resource": "/example/{id}",
             "httpMethod": "GET",
             "headers": {"Content-Type": "application/json"},
             "queryStringParameters": {"key": "value"},
@@ -89,7 +105,7 @@ class TestEventModel(unittest.TestCase):
 
     def test_missing_id_in_path_parameters(self):
         event_data = {
-            "resource": "/example",
+            "resource": "/example/{id}",
             "httpMethod": "DELETE",
             "headers": {"Content-Type": "application/json"},
             "queryStringParameters": {"key": "value"},
