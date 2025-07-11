@@ -115,6 +115,9 @@ class BaseRepository(Generic[T]):
         Método destrutor para garantir que a conexão com o banco de dados
         seja fechada quando o repositório for destruído.
         """
+        self.persist_data()
+
+    def persist_data(self):
         self._db.persist_data(self._table_name)
 
     def create(self, entity: T) -> T:

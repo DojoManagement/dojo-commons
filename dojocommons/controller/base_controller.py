@@ -1,6 +1,6 @@
 import json
 from http import HTTPMethod
-from typing import Callable, Dict, Generic, TypeVar, Type
+from typing import Callable, Dict, Generic, Type, TypeVar
 
 from pydantic import BaseModel
 
@@ -131,6 +131,7 @@ class BaseController(Generic[T]):
         entity = self._model_class.model_validate_json(event.body)
         entity = self._service.create(entity)
         body = f'{{"item": {entity.model_dump_json(exclude_none=True)}}}'
+        self._service.persist()
         return Response(status_code=201, body=body)
 
     def _put(self, event: BaseEvent) -> Response:
@@ -150,9 +151,8 @@ class BaseController(Generic[T]):
 
         updates = self._model_class.model_validate_json(event.body)
         updated_entity = self._service.update(updates)
-        body = (
-            f'{{"item": {updated_entity.model_dump_json(exclude_none=True)}}}'
-        )
+        body = f'{{"item": {updated_entity.model_dump_json(exclude_none=True)}}}'
+        self._service.persist()
         return Response(status_code=200, body=body)
 
     def _delete(self, event: BaseEvent) -> Response:
@@ -166,4 +166,6 @@ class BaseController(Generic[T]):
         """
         entity_id = event.path_parameters.get("id")
         self._service.delete(int(entity_id))
+        self._service.persist()
+
         return Response(status_code=204, body=None)

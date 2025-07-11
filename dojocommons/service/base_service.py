@@ -1,4 +1,5 @@
-from typing import Generic, TypeVar, List, Type
+from typing import Generic, List, Type, TypeVar
+
 from dojocommons.model.app_configuration import AppConfiguration
 from dojocommons.repository.base_repository import BaseRepository
 
@@ -159,3 +160,6 @@ class BaseService(Generic[T]):
     def delete(self, entity_id: int) -> None:
         """Deleta uma entidade pelo ID."""
         self._repository.delete(entity_id)
+
+    def persist(self):
+        self._repository.persist_data()
