@@ -26,6 +26,7 @@ class DbService:
             )
             self._conn.execute("SET s3_url_style='path';")
             self._conn.execute("SET s3_use_ssl=false;")
+            self._conn.execute("SET home_directory='/tmp'")
             self._conn.execute("SET s3_endpoint=?;", (self._app_cfg.aws_endpoint,))
 
     def create_table(self, class_type: type[BaseModel], table_name: str | None = None):

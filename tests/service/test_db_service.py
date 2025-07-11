@@ -37,6 +37,7 @@ class TestDbService(unittest.TestCase):
                 call("SET s3_secret_access_key=?;", ("test_secret_key",)),
                 call("SET s3_url_style='path';"),
                 call("SET s3_use_ssl=false;"),
+                call("SET home_directory='/tmp'"),
                 call("SET s3_endpoint=?;", ("http://localhost:9000",)),
             ],
             mock_conn.execute.call_args_list,
