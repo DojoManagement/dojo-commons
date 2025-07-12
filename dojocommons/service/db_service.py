@@ -1,3 +1,5 @@
+import os
+
 import duckdb
 from pydantic import BaseModel
 
@@ -26,7 +28,10 @@ class DbService:
             )
             self._conn.execute("SET s3_url_style='path';")
             self._conn.execute("SET s3_use_ssl=false;")
-            self._conn.execute("SET home_directory='/tmp'")
+            home_dir = os.environ.get("HOME", "/tmp")
+            if not os.path.exists(home_dir):
+                os.makedirs(home_dir)
+            self._conn.execute(f"SET home_directory='{home_dir}'")
             self._conn.execute("SET s3_endpoint=?;", (self._app_cfg.aws_endpoint,))
 
     def create_table(self, class_type: type[BaseModel], table_name: str | None = None):
