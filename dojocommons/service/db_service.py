@@ -12,6 +12,7 @@ class DbService:
         self._app_cfg = app_cfg
         self._conn = duckdb.connect()
         self._init_duckdb()
+        print(f"[DEBUG][DbService] bucket: {self._app_cfg.s3_bucket}, path: {self._app_cfg.s3_path}")
 
     def __del__(self):
         self.close_connection()
@@ -80,6 +81,7 @@ class DbService:
         """
         file_path = f"{self._app_cfg.s3_file_path}/{table_name}.parquet"
         query = f"COPY {table_name} TO '{file_path}'"
+        print(f"[DEBUG][DbService] Parquet path: {file_path} and query: {query}")
         query += " (FORMAT PARQUET, COMPRESSION ZSTD)"
         return self.execute_query(query)
 
