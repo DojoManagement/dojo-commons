@@ -108,6 +108,8 @@ class BaseRepository(Generic[T]):
         self._db = DbService(cfg)
         self._model = model
         self._table_name = table_name
+        print(f"[DEBUG][BaseRepository] table_name: {self._table_name}")
+        print(f"[DEBUG][BaseRepository] cfg.s3_bucket: {cfg.s3_bucket}, cfg.s3_path: {cfg.s3_path}")
         self._db.create_table(model, table_name)
 
     def __del__(self):
@@ -147,11 +149,12 @@ class BaseRepository(Generic[T]):
         :return: A entidade encontrada ou None se não existir.
         :rtype: Optional[T]
         """
+        print(f"[DEBUG][find_by_id] Buscando id={entity_id} na tabela: {self._table_name}")
         row = self._db.execute_query(
             f"SELECT * FROM {self._table_name} WHERE id = ?",
             (entity_id,),
         ).fetchone()
-
+        print(f"[DEBUG][find_by_id] Resultado: {row}")
         if row:
             return self._model.model_validate(
                 dict(zip(self._model.__annotations__.keys(), row))
@@ -166,7 +169,9 @@ class BaseRepository(Generic[T]):
          no banco de dados.
         :rtype: List[T]
         """
+        print(f"[DEBUG][find_all] Lendo todos da tabela: {self._table_name}")
         rows = self._db.execute_query(f"SELECT * FROM {self._table_name}").fetchall()
+        print(f"[DEBUG][find_all] Resultado: {rows}")
         return [
             self._model.model_validate(
                 dict(zip(self._model.__annotations__.keys(), row))
