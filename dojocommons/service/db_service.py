@@ -18,22 +18,44 @@ class DbService:
         self.close_connection()
 
     def _init_duckdb(self):
+        print(f"[DEBUG][DbService] bucket: {self._app_cfg.s3_bucket}, path: {self._app_cfg.s3_path}")
+        print(f"[DEBUG][DbService] aws_endpoint: {self._app_cfg.aws_endpoint}")
+
+        self._conn.execute("SET home_directory='/tmp'")
         self._conn.execute("INSTALL httpfs; LOAD httpfs;")
-        self._conn.execute("SET s3_region=?;", (self._app_cfg.aws_region,))
+        # Configura credenciais AWS
+        self._conn.execute("SET s3_access_key_id='test';")
+        self._conn.execute("SET s3_secret_access_key='test';")
+        self._conn.execute("SET s3_region='us-east-1';")
+
+        print(f"[DEBUG][DbService] Credenciais AWS configuradas")
         if self._app_cfg.aws_endpoint is not None:
+            print(f"[DEBUG][DbService] Configurando endpoint: {self._app_cfg.aws_endpoint}")
             self._conn.execute(
                 "SET s3_access_key_id=?;", (self._app_cfg.aws_access_key_id,)
             )
+            print(f"[DEBUG][DbService] s3_access_key_id: {self._app_cfg.aws_access_key_id}")
             self._conn.execute(
                 "SET s3_secret_access_key=?;", (self._app_cfg.aws_secret_access_key,)
+            )
+            print(f"[DEBUG][DbService] s3_secret_access_key: {self._app_cfg.aws_secret_access_key}")
+            self._conn.execute(
+                "SET s3_region=?;", (self._app_cfg.aws_region,)
             )
             self._conn.execute("SET s3_url_style='path';")
             self._conn.execute("SET s3_use_ssl=false;")
             home_dir = os.environ.get("HOME", "/tmp")
             if not os.path.exists(home_dir):
                 os.makedirs(home_dir)
-            self._conn.execute(f"SET home_directory='{home_dir}'")
+            #self._conn.execute(f"SET home_directory='{home_dir}'")
             self._conn.execute("SET s3_endpoint=?;", (self._app_cfg.aws_endpoint,))
+        
+        # Testa a configuração
+        try:
+            result = self._conn.execute("SELECT current_setting('s3_endpoint');").fetchone()
+            print(f"[DEBUG][DbService] s3_endpoint atual: {result}")
+        except Exception as e:
+            print(f"[DEBUG][DbService] Erro ao verificar endpoint: {e}")
 
     def create_table(self, class_type: type[BaseModel], table_name: str | None = None):
         """

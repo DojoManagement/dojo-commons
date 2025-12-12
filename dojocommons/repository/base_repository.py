@@ -1,11 +1,12 @@
 from typing import Generic, List, Optional, Type, TypeVar
-
+import threading
 from dojocommons.model.app_configuration import AppConfiguration
 from dojocommons.service.db_service import DbService
 
 # Define um TypeVar para representar o tipo genérico
 T = TypeVar("T")
 
+_id_generation_lock = threading.Lock()
 
 class BaseRepository(Generic[T]):
     """
@@ -57,7 +58,7 @@ class BaseRepository(Generic[T]):
 
         # Definição do modelo
         class User(BaseModel):
-            id: Optional[int]
+            id: Optional[int] = None  # ✅ ID opcional (será gerado automaticamente)
             name: str
             email: str
 
@@ -122,6 +123,28 @@ class BaseRepository(Generic[T]):
     def persist_data(self):
         self._db.persist_data(self._table_name)
 
+    def _generate_next_id(self) -> int:
+        """
+        ✅ Gera o próximo ID disponível de forma thread-safe.
+        
+        Estratégia: Auto-increment (max_id + 1)
+        
+        :return: O próximo ID único disponível.
+        :rtype: int
+        """
+        with _id_generation_lock:
+            # Busca o maior ID atual
+            query = f"SELECT MAX(id) as max_id FROM {self._table_name}"
+            result = self._db.execute_query(query).fetchone()
+            
+            max_id = result[0] if result[0] is not None else 0
+            next_id = max_id + 1
+            
+            print(f"[DEBUG][_generate_next_id] Tabela: {self._table_name}, "
+                  f"max_id={max_id}, next_id={next_id}")
+            
+            return next_id
+
     def create(self, entity: T) -> T:
         """
         Insere uma nova entidade no banco.
@@ -130,6 +153,20 @@ class BaseRepository(Generic[T]):
         :return: A entidade inserida no banco de dados.
         :rtype: T
         """
+        # ✅ Gera ID automaticamente se não fornecido
+        if not hasattr(entity, 'id') or entity.id is None:
+            new_id = self._generate_next_id()
+            entity.id = new_id
+            print(f"[DEBUG][create] ID gerado automaticamente: {new_id}")
+        else:
+            # Valida se o ID já existe (evita sobrescrever)
+            if self.exists_by_id(entity.id):
+                raise ValueError(
+                    f"Entidade com id={entity.id} já existe na tabela {self._table_name}. "
+                    f"Use update() ao invés de create()."
+                )
+            print(f"[DEBUG][create] ID fornecido pelo cliente: {entity.id}")
+
         # Filtra as colunas e valores para ignorar os que são None
         filtered_data = {k: v for k, v in entity.__dict__.items() if v is not None}
 
@@ -138,7 +175,12 @@ class BaseRepository(Generic[T]):
         values = tuple(filtered_data.values())
 
         query = f"INSERT INTO {self._table_name} ({columns}) VALUES ({placeholders})"
+        print(f"[DEBUG][create] Query: {query}")
+        print(f"[DEBUG][create] Values: {values}")
+
         self._db.execute_query(query, values)
+
+        print(f"[INFO][create] Entidade criada com sucesso: id={entity.id}")
         return entity
 
     def find_by_id(self, entity_id: int) -> Optional[T]:
@@ -150,18 +192,24 @@ class BaseRepository(Generic[T]):
         :rtype: Optional[T]
         """
         print(f"[DEBUG][find_by_id] Buscando id={entity_id} na tabela: {self._table_name}")
-        row = self._db.execute_query(
+
+        cursor = self._db.execute_query(
             f"SELECT * FROM {self._table_name} WHERE id = ?",
             (entity_id,),
-        ).fetchone()
+        )
+        row = cursor.fetchone()
         print(f"[DEBUG][find_by_id] Resultado: {row}")
+        
         if row:
-            return self._model.model_validate(
-                dict(zip(self._model.__annotations__.keys(), row))
-            )
+            column_names = [description[0] for description in cursor.description]
+            row_dict = dict(zip(column_names, row))
+            print(f"[DEBUG][find_by_id] row_dict: {row_dict}")
+            
+            return self._model.model_validate(row_dict)
+        
         return None
 
-    def find_all(self) -> List[T]:
+    def find_all(self, **filters) -> List[T]:
         """
         Retorna todas as entidades cadastradas.
 
@@ -170,14 +218,38 @@ class BaseRepository(Generic[T]):
         :rtype: List[T]
         """
         print(f"[DEBUG][find_all] Lendo todos da tabela: {self._table_name}")
-        rows = self._db.execute_query(f"SELECT * FROM {self._table_name}").fetchall()
+        query = f"SELECT * FROM {self._table_name}"
+        if filters:
+            where_clauses = [f"{key} = {value}" for key, value in filters.items()]
+            print(f"[DEBUG][find_all] Consulta com filtros: {where_clauses}")
+            query += f" WHERE {' AND '.join(where_clauses)}"
+            values = tuple(filters.values())
+            cursor = self._db.execute_query(query, values)
+        else:
+            cursor = self._db.execute_query(query)
+        
+        rows = cursor.fetchall()
         print(f"[DEBUG][find_all] Resultado: {rows}")
-        return [
-            self._model.model_validate(
-                dict(zip(self._model.__annotations__.keys(), row))
-            )
-            for row in rows
-        ]
+
+        # ✅ CORREÇÃO: Pegar os nomes das colunas do cursor
+        column_names = [description[0] for description in cursor.description]
+        print(f"[DEBUG][find_all] Colunas: {column_names}")
+
+        # ✅ Mapear cada linha para um dict com os nomes corretos das colunas
+        result = []
+        for row in rows:
+            row_dict = dict(zip(column_names, row))
+            print(f"[DEBUG][find_all] row_dict: {row_dict}")
+
+            try:
+                entity = self._model.model_validate(row_dict)
+                result.append(entity)
+            except Exception as e:
+                print(f"[ERROR][find_all] Erro ao validar entidade: {e}")
+                print(f"[ERROR][find_all] row_dict problemático: {row_dict}")
+                raise
+            
+        return result
 
     def update(self, entity_id: int, updates: dict) -> Optional[T]:
         """
@@ -202,6 +274,41 @@ class BaseRepository(Generic[T]):
 
         return self.find_by_id(entity_id)
 
+#    def update(self, entity_id: int, updates: dict) -> Optional[T]:
+#        """
+#        Atualiza uma entidade pelo ID.
+#
+#        :param int entity_id: O ID da entidade a ser atualizada.
+#        :param dict updates: Um dicionário com os campos a serem atualizados
+#            e seus novos valores.
+#        :return: A entidade atualizada ou None se não existir.
+#        :rtype: Optional[T]
+#        """
+#        # ✅ Não permite atualizar o ID
+#        if 'id' in updates:
+#            print(f"[WARNING][update] Tentativa de atualizar ID será ignorada")
+#            del updates['id']
+#
+#        # Filtra as colunas e valores para ignorar os que são None
+#        filtered_data = {k: v for k, v in updates.items() if v is not None}
+#
+#        if not filtered_data:
+#            print(f"[WARNING][update] Nenhum campo para atualizar")
+#            return self.find_by_id(entity_id)
+#
+#        updates_sql = ", ".join([f"{key} = ?" for key in filtered_data.keys()])
+#        values = list(filtered_data.values()) + [entity_id]
+#
+#        query = f"UPDATE {self._table_name} SET {updates_sql} WHERE id = ?"
+#        print(f"[DEBUG][update] Query: {query}")
+#        print(f"[DEBUG][update] Values: {values}")
+#
+#        self._db.execute_query(query, tuple(values))
+#        
+#        print(f"[INFO][update] Entidade atualizada: id={entity_id}")
+#        return self.find_by_id(entity_id)
+
+
     def delete(self, entity_id: int) -> None:
         """
         Deleta uma entidade pelo ID.
@@ -212,3 +319,13 @@ class BaseRepository(Generic[T]):
             f"DELETE FROM {self._table_name} WHERE id = ?",
             (entity_id,),
         )
+
+    def exists_by_id(self, id_value: int) -> bool:
+        """
+        Verifica se um registro com o ID especificado já existe.
+        :param id_value: Valor do ID a ser verificado.
+        :return: True se existir, False caso contrário.
+        """
+        query = f"SELECT COUNT(*) as count FROM {self._table_name} WHERE id = ?"
+        result = self._db.execute_query(query, (id_value,)).fetchone()
+        return result[0] > 0
