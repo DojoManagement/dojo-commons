@@ -89,8 +89,6 @@ class BaseController(Generic[T]):
         print(f"[DEBUG][_get] self._resource: {self._resource}")
         print(f"[DEBUG][_get] self._resource_ID: {getattr(self, '_resource', None)}_ID")
         print(f"[DEBUG][_get] event.resource == self._resource? {event.resource == self._resource}")
-        print(f"[DEBUG][_get] event.resource (len={len(event.resource)})")
-        print(f"[DEBUG][_get] self._resource (len={len(self._resource)})")
         try:
             if event.resource == self._resource:
                 print("[DEBUG][_get] Entrou em _list")
