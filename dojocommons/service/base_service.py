@@ -2,6 +2,7 @@ from typing import Generic, List, Type, TypeVar
 
 from dojocommons.model.app_configuration import AppConfiguration
 from dojocommons.repository.base_repository import BaseRepository
+from dojocommons.exception.business_exception import BusinessException
 
 # Define um TypeVar para representar o tipo genérico T
 T = TypeVar("T")
@@ -141,7 +142,21 @@ class BaseService(Generic[T]):
     ):
         self._repository = repository_class(cfg)  # type: ignore
 
+    def _validate_unique_id(self, entity):
+        """
+        Valida se o ID é único antes de criar.
+        :param entity: Entidade a ser validada.
+        :raises BusinessException: Se o ID já existir.
+        """
+        if hasattr(entity, 'id') and entity.id is not None:
+            if self._repository.exists_by_id(entity.id):
+                raise BusinessException(
+                    f"Já existe um registro com o ID {entity.id}",
+                    status_code=409  # Conflict
+                )
+    
     def create(self, entity: T) -> T:
+        self._validate_unique_id(entity)
         """Cria uma nova entidade."""
         return self._repository.create(entity)
 
@@ -149,9 +164,14 @@ class BaseService(Generic[T]):
         """Obtém uma entidade pelo ID."""
         return self._repository.find_by_id(entity_id)
 
-    def list_all(self) -> List[T]:
+    def list_all(self, **filters) -> List[T]:
         """Lista todas as entidades."""
-        return self._repository.find_all()
+        print("[DEBUG][Service] Chamando find_all")
+        if not filters:
+            print("[DEBUG][Service] Sem filtros, chamando find_all sem parâmetros")
+            return self._repository.find_all()
+        print(f"[DEBUG][Service] Com filtros: {filters}, chamando find_all com parâmetros")
+        return self._repository.find_all(**filters)
 
     def update(self, entity: T) -> T:
         """Atualiza uma entidade."""
