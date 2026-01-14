@@ -37,10 +37,34 @@ class DbService:
         else:
             # Configuração para AWS real (produção) - usa credenciais da IAM Role
             print(f"[DEBUG][DbService] Configurando para AWS (usando IAM Role)")
-            # Não configurar credenciais - DuckDB vai pegar automaticamente da IAM Role
-            self._conn.execute("SET s3_region=?;", (self._app_cfg.aws_region or 'sa-east-1',))
+            
+            # Log da IAM Role sendo usada
+            try:
+                import boto3
+                session = boto3.Session()
+                credentials = session.get_credentials()
+                if credentials:
+                    print(f"[DEBUG][DbService] Credenciais AWS disponíveis - Access Key ID: {credentials.access_key[:8]}...")
+                
+                # Tenta obter informações da role via STS
+                sts = session.client('sts')
+                identity = sts.get_caller_identity()
+                print(f"[DEBUG][DbService] IAM Identity ARN: {identity.get('Arn')}")
+            except Exception as e:
+                print(f"[DEBUG][DbService] Não foi possível obter info da IAM Role: {e}")
+                # Fallback: mostra variáveis de ambiente do Lambda
+                lambda_function = os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'N/A')
+                print(f"[DEBUG][DbService] Lambda Function: {lambda_function}")
+            
+            region = self._app_cfg.aws_region or 'sa-east-1'
+            self._conn.execute("SET s3_region=?;", (region,))
             self._conn.execute("SET s3_url_style='path';")
-            # AWS Lambda já tem credenciais via IAM Role
+            regional_endpoint = f"s3.{region}.amazonaws.com"
+            self._conn.execute("SET s3_endpoint=?;", (regional_endpoint,))
+            self._conn.execute("SET s3_use_ssl=true;")
+            self._conn.execute("SET s3_url_compatibility_mode=true;")
+            
+            print(f"[DEBUG][DbService] AWS configurado - Region: {region}, Endpoint: {regional_endpoint}")
             print(f"[DEBUG][DbService] Credenciais AWS obtidas via IAM Role")
         
         # Testa a configuração
