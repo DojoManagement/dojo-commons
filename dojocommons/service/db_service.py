@@ -23,32 +23,25 @@ class DbService:
 
         self._conn.execute("SET home_directory='/tmp'")
         self._conn.execute("INSTALL httpfs; LOAD httpfs;")
-        # Configura credenciais AWS
-        self._conn.execute("SET s3_access_key_id='test';")
-        self._conn.execute("SET s3_secret_access_key='test';")
-        self._conn.execute("SET s3_region='us-east-1';")
-
-        print(f"[DEBUG][DbService] Credenciais AWS configuradas")
+        
+        # Configuração para LocalStack (desenvolvimento)
         if self._app_cfg.aws_endpoint is not None:
-            print(f"[DEBUG][DbService] Configurando endpoint: {self._app_cfg.aws_endpoint}")
-            self._conn.execute(
-                "SET s3_access_key_id=?;", (self._app_cfg.aws_access_key_id,)
-            )
-            print(f"[DEBUG][DbService] s3_access_key_id: {self._app_cfg.aws_access_key_id}")
-            self._conn.execute(
-                "SET s3_secret_access_key=?;", (self._app_cfg.aws_secret_access_key,)
-            )
-            print(f"[DEBUG][DbService] s3_secret_access_key: {self._app_cfg.aws_secret_access_key}")
-            self._conn.execute(
-                "SET s3_region=?;", (self._app_cfg.aws_region,)
-            )
+            print(f"[DEBUG][DbService] Configurando para LocalStack")
+            self._conn.execute("SET s3_access_key_id='test';")
+            self._conn.execute("SET s3_secret_access_key='test';")
+            self._conn.execute("SET s3_region='us-east-1';")
             self._conn.execute("SET s3_url_style='path';")
             self._conn.execute("SET s3_use_ssl=false;")
-            home_dir = os.environ.get("HOME", "/tmp")
-            if not os.path.exists(home_dir):
-                os.makedirs(home_dir)
-            #self._conn.execute(f"SET home_directory='{home_dir}'")
             self._conn.execute("SET s3_endpoint=?;", (self._app_cfg.aws_endpoint,))
+            print(f"[DEBUG][DbService] LocalStack endpoint configurado: {self._app_cfg.aws_endpoint}")
+        else:
+            # Configuração para AWS real (produção) - usa credenciais da IAM Role
+            print(f"[DEBUG][DbService] Configurando para AWS (usando IAM Role)")
+            # Não configurar credenciais - DuckDB vai pegar automaticamente da IAM Role
+            self._conn.execute("SET s3_region=?;", (self._app_cfg.aws_region or 'sa-east-1',))
+            self._conn.execute("SET s3_url_style='path';")
+            # AWS Lambda já tem credenciais via IAM Role
+            print(f"[DEBUG][DbService] Credenciais AWS obtidas via IAM Role")
         
         # Testa a configuração
         try:
