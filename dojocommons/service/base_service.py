@@ -3,6 +3,7 @@ from typing import Generic, List, Type, TypeVar
 from dojocommons.model.app_configuration import AppConfiguration
 from dojocommons.repository.base_repository import BaseRepository
 from dojocommons.exception.business_exception import BusinessException
+from dojocommons.util.id_generator import IdGenerator
 
 # Define um TypeVar para representar o tipo genérico T
 T = TypeVar("T")
@@ -156,12 +157,48 @@ class BaseService(Generic[T]):
                 )
     
     def create(self, entity: T) -> T:
-        self._validate_unique_id(entity)
-        """Cria uma nova entidade."""
+        """
+        Cria uma nova entidade.
+        
+        Se a entidade não tiver ID (ou ID vazio/None), 
+        gera um UUID v4 automaticamente.
+        
+        Args:
+            entity: Entidade a ser criada (pode ter ou não ID)
+            
+        Returns:
+            T: Entidade criada com ID gerado
+            
+        Raises:
+            BusinessException: Se o ID fornecido já existir
+        """
+        # Se não tem ID ou ID está vazio, gera UUID
+        if not hasattr(entity, 'id') or not entity.id or entity.id == '':
+            new_id = IdGenerator.generate()
+            # Usar setattr para definir o ID
+            if hasattr(entity, '__dict__'):
+                entity.id = new_id
+            else:
+                # Para modelos Pydantic, usar model_copy
+                entity = entity.model_copy(update={'id': new_id})
+            print(f"[DEBUG][BaseService] ID gerado automaticamente: {new_id}")
+        else:
+            # Se tem ID, valida unicidade
+            self._validate_unique_id(entity)
+            print(f"[DEBUG][BaseService] Usando ID fornecido: {entity.id}")
+        
         return self._repository.create(entity)
 
-    def get_by_id(self, entity_id: int) -> T:
-        """Obtém uma entidade pelo ID."""
+    def get_by_id(self, entity_id: str) -> T:
+        """
+        Obtém uma entidade pelo ID.
+        
+        Args:
+            entity_id: UUID da entidade (string)
+            
+        Returns:
+            T: Entidade encontrada
+        """
         return self._repository.find_by_id(entity_id)
 
     def list_all(self, **filters) -> List[T]:
@@ -177,8 +214,13 @@ class BaseService(Generic[T]):
         """Atualiza uma entidade."""
         return self._repository.update(entity.id, entity.model_dump())
 
-    def delete(self, entity_id: int) -> None:
-        """Deleta uma entidade pelo ID."""
+    def delete(self, entity_id: str) -> None:
+        """
+        Deleta uma entidade pelo ID.
+        
+        Args:
+            entity_id: UUID da entidade (string)
+        """
         self._repository.delete(entity_id)
 
     def persist(self):
