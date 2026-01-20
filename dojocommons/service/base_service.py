@@ -1,12 +1,13 @@
-from typing import Generic, List, Type, TypeVar
+from typing import Generic, TypeVar
 
-from dojocommons.model.app_configuration import AppConfiguration
-from dojocommons.repository.base_repository import BaseRepository
 from dojocommons.exception.business_exception import BusinessException
-from dojocommons.util.id_generator import IdGenerator
+from dojocommons.log.logging import logger
+from dojocommons.model.app_configuration import AppConfiguration
+from dojocommons.model.base_entity import BaseEntity
+from dojocommons.repository.base_repository import BaseRepository
 
 # Define um TypeVar para representar o tipo genérico T
-T = TypeVar("T")
+T = TypeVar("T", bound=BaseEntity)
 
 
 class BaseService(Generic[T]):
@@ -14,8 +15,10 @@ class BaseService(Generic[T]):
     BaseService
     ===========
 
-    Uma classe genérica para manipulação de entidades utilizando um repositório base.
-    Esta classe fornece métodos para operações CRUD (Create, Read, Update, Delete) em entidades.
+    Uma classe genérica para manipulação de entidades utilizando um
+    repositório base.
+    Esta classe fornece métodos para operações CRUD
+    (Create, Read, Update, Delete) em entidades.
 
     Classes
     -------
@@ -84,21 +87,25 @@ class BaseService(Generic[T]):
         from dojocommons.repository.base_repository import BaseRepository
         from dojocommons.service.base_service import BaseService
 
+
         # Definição do modelo
         class User(BaseModel):
             id: Optional[int]
             name: str
             email: str
 
+
         # Definição do repositório
         class UserRepository(BaseRepository[User]):
             def __init__(self, cfg: AppConfiguration):
                 super().__init__(cfg, User, "users")
 
+
         # Definição do serviço
         class UserService(BaseService[User]):
             def __init__(self, cfg: AppConfiguration):
                 super().__init__(cfg, UserRepository)
+
 
         # Configuração da aplicação
         app_cfg = AppConfiguration(
@@ -125,7 +132,9 @@ class BaseService(Generic[T]):
             print(f"Usuário encontrado: {user.name} - {user.email}")
 
         # Atualização de um usuário
-        updated_user = user_service.update(User(id=1, name="John Smith", email="john.smith@example.com"))
+        updated_user = user_service.update(
+            User(id=1, name="John Smith", email="john.smith@example.com")
+        )
         if updated_user:
             print(f"Usuário atualizado: {updated_user.name}")
 
@@ -139,9 +148,9 @@ class BaseService(Generic[T]):
     """
 
     def __init__(
-        self, cfg: AppConfiguration, repository_class: Type[BaseRepository[T]]
+        self, cfg: AppConfiguration, repository_class: type[BaseRepository[T]]
     ):
-        self._repository = repository_class(cfg)  # type: ignore
+        self._repository = repository_class(cfg)  # type: ignore[assignment]
 
     def _validate_unique_id(self, entity):
         """
@@ -149,77 +158,72 @@ class BaseService(Generic[T]):
         :param entity: Entidade a ser validada.
         :raises BusinessException: Se o ID já existir.
         """
-        if hasattr(entity, 'id') and entity.id is not None:
-            if self._repository.exists_by_id(entity.id):
-                raise BusinessException(
-                    f"Já existe um registro com o ID {entity.id}",
-                    status_code=409  # Conflict
-                )
-    
+        if self._repository.exists_by_id(entity.id):
+            msg = f"Já existe um registro com o ID {entity.id}"
+            raise BusinessException(
+                msg,
+                status_code=409,  # Conflict
+            )
+
     def create(self, entity: T) -> T:
         """
         Cria uma nova entidade.
-        
-        Se a entidade não tiver ID (ou ID vazio/None), 
+
+        Se a entidade não tiver ID (ou ID vazio/None),
         gera um UUID v4 automaticamente.
-        
+
         Args:
             entity: Entidade a ser criada (pode ter ou não ID)
-            
+
         Returns:
             T: Entidade criada com ID gerado
-            
+
         Raises:
             BusinessException: Se o ID fornecido já existir
+
         """
-        # Se não tem ID ou ID está vazio, gera UUID
-        if not hasattr(entity, 'id') or not entity.id or entity.id == '':
-            new_id = IdGenerator.generate()
-            # Usar setattr para definir o ID
-            if hasattr(entity, '__dict__'):
-                entity.id = new_id
-            else:
-                # Para modelos Pydantic, usar model_copy
-                entity = entity.model_copy(update={'id': new_id})
-            print(f"[DEBUG][BaseService] ID gerado automaticamente: {new_id}")
-        else:
-            # Se tem ID, valida unicidade
-            self._validate_unique_id(entity)
-            print(f"[DEBUG][BaseService] Usando ID fornecido: {entity.id}")
-        
+        self._validate_unique_id(entity)
+
+        logger.debug("Criando entidade", entity=entity)
+
         return self._repository.create(entity)
 
-    def get_by_id(self, entity_id: str) -> T:
+    def get_by_id(self, entity_id: str) -> T | None:
         """
         Obtém uma entidade pelo ID.
-        
+
         Args:
             entity_id: UUID da entidade (string)
-            
+
         Returns:
             T: Entidade encontrada
+
         """
         return self._repository.find_by_id(entity_id)
 
-    def list_all(self, **filters) -> List[T]:
+    def list_all(self, **filters) -> list[T]:
         """Lista todas as entidades."""
-        print("[DEBUG][Service] Chamando find_all")
+        logger.debug("Listando todas as entidades", filters=filters)
         if not filters:
-            print("[DEBUG][Service] Sem filtros, chamando find_all sem parâmetros")
+            logger.debug("Sem filtros, chamando find_all sem parâmetros")
             return self._repository.find_all()
-        print(f"[DEBUG][Service] Com filtros: {filters}, chamando find_all com parâmetros")
+
+        logger.debug(
+            "Com filtros, chamando find_all com parâmetros", filters=filters
+        )
         return self._repository.find_all(**filters)
 
-    def update(self, entity: T) -> T:
+    def update(self, entity: T) -> T | None:
         """Atualiza uma entidade."""
         return self._repository.update(entity.id, entity.model_dump())
 
     def delete(self, entity_id: str) -> None:
         """
         Deleta uma entidade pelo ID.
-        
+
         Args:
             entity_id: UUID da entidade (string)
+
         """
         self._repository.delete(entity_id)
 

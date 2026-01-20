@@ -1,12 +1,36 @@
-from typing import Generic, List, Optional, Type, TypeVar
+import re
 import threading
+from typing import Generic, TypeVar
+
+from dojocommons.log.logging import logger
 from dojocommons.model.app_configuration import AppConfiguration
+from dojocommons.model.base_entity import BaseEntity
 from dojocommons.service.db_service import DbService
 
 # Define um TypeVar para representar o tipo genérico
-T = TypeVar("T")
+T = TypeVar("T", bound=BaseEntity)
 
 _id_generation_lock = threading.Lock()
+
+_TABLE_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+
+def _validate_table_name(table_name: str) -> str:
+    """
+    Valida o nome da tabela para evitar SQL injection.
+
+    :param table_name: Nome da tabela a validar
+    :return: O nome da tabela se válido
+    :raises ValueError: Se o nome for inválido
+    """
+    if not _TABLE_NAME_PATTERN.match(table_name):
+        msg = (
+            f"Nome de tabela inválido: '{table_name}'. "
+            f"Use apenas letras, números e underscores."
+        )
+        raise ValueError(msg)
+    return table_name
+
 
 class BaseRepository(Generic[T]):
     """
@@ -14,9 +38,9 @@ class BaseRepository(Generic[T]):
     ==============
 
     Uma classe genérica para manipulação de entidades em um banco de dados.
-     Esta classe utiliza o `DbService` para executar operações no
-      banco de dados e é projetada para trabalhar com modelos que seguem
-       o padrão de validação do Pydantic.
+    Esta classe utiliza o `DbService` para executar operações no
+    banco de dados e é projetada para trabalhar com modelos que seguem
+    o padrão de validação do Pydantic.
 
     Classes
     -------
@@ -27,10 +51,10 @@ class BaseRepository(Generic[T]):
     ----------
     cfg : AppConfiguration
         Configuração da aplicação, utilizada para inicializar o serviço de
-         banco de dados.
+        banco de dados.
     model : Type[T]
         O modelo da entidade que será manipulado. Deve ser uma classe que
-         segue o padrão de validação do Pydantic.
+        segue o padrão de validação do Pydantic.
     table_name : str
         O nome da tabela no banco de dados onde as entidades serão armazenadas.
 
@@ -56,16 +80,21 @@ class BaseRepository(Generic[T]):
         from dojocommons.model.app_configuration import AppConfiguration
         from dojocommons.repository.base_repository import BaseRepository
 
+
         # Definição do modelo
         class User(BaseModel):
-            id: Optional[int] = None  # ✅ ID opcional (será gerado automaticamente)
+            id: Optional[int] = (
+                None  # ✅ ID opcional (será gerado automaticamente)
+            )
             name: str
             email: str
+
 
         # Definição do repositório
         class UserRepository(BaseRepository[User]):
             def __init__(self, cfg: AppConfiguration):
                 super().__init__(cfg, User, "users")
+
 
         # Configuração da aplicação
         app_cfg = AppConfiguration(
@@ -105,12 +134,16 @@ class BaseRepository(Generic[T]):
         user_repository.delete(1)
     """
 
-    def __init__(self, cfg: AppConfiguration, model: Type[T], table_name: str):
+    def __init__(self, cfg: AppConfiguration, model: type[T], table_name: str):
         self._db = DbService(cfg)
         self._model = model
-        self._table_name = table_name
-        print(f"[DEBUG][BaseRepository] table_name: {self._table_name}")
-        print(f"[DEBUG][BaseRepository] cfg.s3_bucket: {cfg.s3_bucket}, cfg.s3_path: {cfg.s3_path}")
+        self._table_name = _validate_table_name(table_name)
+        logger.debug(
+            "Inicializando BaseRepository",
+            table_name=self._table_name,
+            cfg_s3_bucket=cfg.s3_bucket,
+            cfg_s3_path=cfg.s3_path,
+        )
         self._db.create_table(model, table_name)
 
     def __del__(self):
@@ -123,28 +156,6 @@ class BaseRepository(Generic[T]):
     def persist_data(self):
         self._db.persist_data(self._table_name)
 
-    def _generate_next_id(self) -> int:
-        """
-        ✅ Gera o próximo ID disponível de forma thread-safe.
-        
-        Estratégia: Auto-increment (max_id + 1)
-        
-        :return: O próximo ID único disponível.
-        :rtype: int
-        """
-        with _id_generation_lock:
-            # Busca o maior ID atual
-            query = f"SELECT MAX(id) as max_id FROM {self._table_name}"
-            result = self._db.execute_query(query).fetchone()
-            
-            max_id = result[0] if result[0] is not None else 0
-            next_id = max_id + 1
-            
-            print(f"[DEBUG][_generate_next_id] Tabela: {self._table_name}, "
-                  f"max_id={max_id}, next_id={next_id}")
-            
-            return next_id
-
     def create(self, entity: T) -> T:
         """
         Insere uma nova entidade no banco.
@@ -153,37 +164,44 @@ class BaseRepository(Generic[T]):
         :return: A entidade inserida no banco de dados.
         :rtype: T
         """
-        # ✅ Gera ID automaticamente se não fornecido
-        if not hasattr(entity, 'id') or entity.id is None:
-            new_id = self._generate_next_id()
-            entity.id = new_id
-            print(f"[DEBUG][create] ID gerado automaticamente: {new_id}")
-        else:
-            # Valida se o ID já existe (evita sobrescrever)
-            if self.exists_by_id(entity.id):
-                raise ValueError(
-                    f"Entidade com id={entity.id} já existe na tabela {self._table_name}. "
-                    f"Use update() ao invés de create()."
-                )
-            print(f"[DEBUG][create] ID fornecido pelo cliente: {entity.id}")
+        if self.exists_by_id(entity.id):
+            msg = (
+                f"Entidade com id={entity.id} "
+                "já existe na tabela {self._table_name}. "
+                f"Use update() ao invés de create()."
+            )
+            raise ValueError(msg)
+
+        logger.debug(
+            "Criando entidade",
+            table_name=self._table_name,
+            entity_id=entity.id,
+        )
 
         # Filtra as colunas e valores para ignorar os que são None
-        filtered_data = {k: v for k, v in entity.__dict__.items() if v is not None}
+        filtered_data = entity.model_dump(exclude_none=True)
 
         columns = ", ".join(filtered_data.keys())
         placeholders = ", ".join(["?"] * len(filtered_data))
         values = tuple(filtered_data.values())
 
-        query = f"INSERT INTO {self._table_name} ({columns}) VALUES ({placeholders})"
-        print(f"[DEBUG][create] Query: {query}")
-        print(f"[DEBUG][create] Values: {values}")
+        query = (
+            f"INSERT INTO {self._table_name} ({columns})"  # noqa: S608
+            f" VALUES ({placeholders})"
+        )
+
+        logger.debug("Executando query de criação", query=query, values=values)
 
         self._db.execute_query(query, values)
 
-        print(f"[INFO][create] Entidade criada com sucesso: id={entity.id}")
+        logger.info(
+            "Entidade criada com sucesso",
+            table_name=self._table_name,
+            entity_id=entity.id,
+        )
         return entity
 
-    def find_by_id(self, entity_id: int) -> Optional[T]:
+    def find_by_id(self, entity_id: str) -> T | None:
         """
         Busca uma entidade pelo ID.
 
@@ -191,141 +209,131 @@ class BaseRepository(Generic[T]):
         :return: A entidade encontrada ou None se não existir.
         :rtype: Optional[T]
         """
-        print(f"[DEBUG][find_by_id] Buscando id={entity_id} na tabela: {self._table_name}")
-
-        cursor = self._db.execute_query(
-            f"SELECT * FROM {self._table_name} WHERE id = ?",
-            (entity_id,),
+        logger.debug(
+            "Buscando entidade por ID",
+            table_name=self._table_name,
+            entity_id=entity_id,
         )
+        query = f"SELECT * FROM {self._table_name} WHERE id = ?"  # noqa: S608
+        cursor = self._db.execute_query(query, (entity_id,))
         row = cursor.fetchone()
-        print(f"[DEBUG][find_by_id] Resultado: {row}")
-        
+
+        logger.debug("Consulta executada", query=query, result=row)
+
         if row:
-            column_names = [description[0] for description in cursor.description]
-            row_dict = dict(zip(column_names, row))
-            print(f"[DEBUG][find_by_id] row_dict: {row_dict}")
-            
+            if cursor.description is None:
+                return None
+            column_names = [
+                description[0] for description in cursor.description
+            ]
+            row_dict = dict(zip(column_names, row, strict=False))
+
+            logger.debug(
+                "Mapeando resultado para dicionário", row_dict=row_dict
+            )
+
             return self._model.model_validate(row_dict)
-        
+
         return None
 
-    def find_all(self, **filters) -> List[T]:
+    def find_all(self, **filters) -> list[T]:
         """
         Retorna todas as entidades cadastradas.
 
         :return: Uma lista de todas as entidades cadastradas
-         no banco de dados.
+        no banco de dados.
         :rtype: List[T]
         """
-        print(f"[DEBUG][find_all] Lendo todos da tabela: {self._table_name}")
-        query = f"SELECT * FROM {self._table_name}"
+        logger.debug(
+            "Buscando todas as entidades", table_name=self._table_name
+        )
+        query = f"SELECT * FROM {self._table_name}"  # noqa: S608
         if filters:
-            where_clauses = [f"{key} = {value}" for key, value in filters.items()]
-            print(f"[DEBUG][find_all] Consulta com filtros: {where_clauses}")
+            where_clauses = [
+                f"{key} = {value}" for key, value in filters.items()
+            ]
+            logger.debug("Consulta com filtros", where_clauses=where_clauses)
+
             query += f" WHERE {' AND '.join(where_clauses)}"
             values = tuple(filters.values())
             cursor = self._db.execute_query(query, values)
         else:
             cursor = self._db.execute_query(query)
-        
+
         rows = cursor.fetchall()
-        print(f"[DEBUG][find_all] Resultado: {rows}")
+        logger.debug("Resultado da consulta", query=query, rows=rows)
 
         # ✅ CORREÇÃO: Pegar os nomes das colunas do cursor
+        if cursor.description is None:
+            return []
         column_names = [description[0] for description in cursor.description]
-        print(f"[DEBUG][find_all] Colunas: {column_names}")
+        logger.debug("Colunas obtidas do cursor", column_names=column_names)
 
         # ✅ Mapear cada linha para um dict com os nomes corretos das colunas
         result = []
         for row in rows:
-            row_dict = dict(zip(column_names, row))
-            print(f"[DEBUG][find_all] row_dict: {row_dict}")
+            row_dict = dict(zip(column_names, row, strict=False))
+            logger.debug("Mapeando linha para dicionário", row=row)
 
             try:
                 entity = self._model.model_validate(row_dict)
                 result.append(entity)
             except Exception as e:
-                print(f"[ERROR][find_all] Erro ao validar entidade: {e}")
-                print(f"[ERROR][find_all] row_dict problemático: {row_dict}")
+                logger.exception(
+                    "Erro ao validar entidade", row_dict=row_dict, exception=e
+                )
                 raise
-            
+
         return result
 
-    def update(self, entity_id: int, updates: dict) -> Optional[T]:
+    def update(self, entity_id: str, updates: dict) -> T | None:
         """
         Atualiza uma entidade pelo ID.
 
         :param int entity_id: O ID da entidade a ser atualizada.
         :param dict updates: Um dicionário com os campos a serem atualizados
-         e seus novos valores.
+        e seus novos valores.
         :return: A entidade atualizada ou None se não existir.
         :rtype: Optional[T]
         """
         # Filtra as colunas e valores para ignorar os que são None
         filtered_data = {k: v for k, v in updates.items() if v is not None}
 
-        updates_sql = ", ".join([f"{key} = ?" for key in filtered_data.keys()])
-        values = list(filtered_data.values()) + [entity_id]
+        updates_sql = ", ".join([f"{key} = ?" for key in filtered_data])
+        values = [*list(filtered_data.values()), entity_id]
 
         self._db.execute_query(
-            f"UPDATE {self._table_name} SET {updates_sql} WHERE id = ?",
+            f"UPDATE {self._table_name} "  # noqa: S608
+            f"SET {updates_sql} WHERE id = ?",
             tuple(values),
         )
 
         return self.find_by_id(entity_id)
 
-#    def update(self, entity_id: int, updates: dict) -> Optional[T]:
-#        """
-#        Atualiza uma entidade pelo ID.
-#
-#        :param int entity_id: O ID da entidade a ser atualizada.
-#        :param dict updates: Um dicionário com os campos a serem atualizados
-#            e seus novos valores.
-#        :return: A entidade atualizada ou None se não existir.
-#        :rtype: Optional[T]
-#        """
-#        # ✅ Não permite atualizar o ID
-#        if 'id' in updates:
-#            print(f"[WARNING][update] Tentativa de atualizar ID será ignorada")
-#            del updates['id']
-#
-#        # Filtra as colunas e valores para ignorar os que são None
-#        filtered_data = {k: v for k, v in updates.items() if v is not None}
-#
-#        if not filtered_data:
-#            print(f"[WARNING][update] Nenhum campo para atualizar")
-#            return self.find_by_id(entity_id)
-#
-#        updates_sql = ", ".join([f"{key} = ?" for key in filtered_data.keys()])
-#        values = list(filtered_data.values()) + [entity_id]
-#
-#        query = f"UPDATE {self._table_name} SET {updates_sql} WHERE id = ?"
-#        print(f"[DEBUG][update] Query: {query}")
-#        print(f"[DEBUG][update] Values: {values}")
-#
-#        self._db.execute_query(query, tuple(values))
-#        
-#        print(f"[INFO][update] Entidade atualizada: id={entity_id}")
-#        return self.find_by_id(entity_id)
-
-
-    def delete(self, entity_id: int) -> None:
+    def delete(self, entity_id: str) -> None:
         """
         Deleta uma entidade pelo ID.
 
         :param int entity_id: O ID da entidade a ser deletada.
         """
         self._db.execute_query(
-            f"DELETE FROM {self._table_name} WHERE id = ?",
+            f"DELETE FROM {self._table_name} WHERE id = ?",  # noqa: S608
             (entity_id,),
         )
 
-    def exists_by_id(self, id_value: int) -> bool:
+    def exists_by_id(self, id_value: str) -> bool:
         """
         Verifica se um registro com o ID especificado já existe.
         :param id_value: Valor do ID a ser verificado.
         :return: True se existir, False caso contrário.
         """
-        query = f"SELECT COUNT(*) as count FROM {self._table_name} WHERE id = ?"
+        query = (
+            "SELECT COUNT(*) as count "  # noqa: S608
+            f"FROM {self._table_name} WHERE id = ?"
+        )
         result = self._db.execute_query(query, (id_value,)).fetchone()
+
+        if result is None:
+            return False
+
         return result[0] > 0
