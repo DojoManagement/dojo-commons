@@ -11,6 +11,7 @@ license = { text = "MIT" }
 dependencies = [
     "boto3~=1.37.18",
     "duckdb~=1.2.1",
+    "loguru>=0.7.3",
     "pydantic~=2.10.6",
     "pydantic-settings~=2.8.1",
 ]
