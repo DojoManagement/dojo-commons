@@ -65,7 +65,7 @@ def test_post_missing_body(controller, event):
 def test_put_update(controller, use_cases, event):
     event.http_method = HTTPMethod.PUT
     event.path_parameters = {"id": "123"}
-    event.body = {"nome": "Novo"}
+    event.body = '{"nome": "Novo"}'
 
     use_cases["update"].execute.return_value = {"id": "123", "nome": "Novo"}
 

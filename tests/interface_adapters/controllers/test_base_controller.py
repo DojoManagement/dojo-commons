@@ -1,20 +1,11 @@
-from http import HTTPMethod, HTTPStatus
+from http import HTTPStatus
 
 from dojocommons.interface_adapters.controllers.base_controller import (
     BaseController,
 )
 from dojocommons.interface_adapters.dtos.base_event import BaseEvent
 from dojocommons.interface_adapters.dtos.response import Response
-
-
-class TestController(BaseController):
-    def __init__(self):
-        self._routes = {
-            HTTPMethod.GET: self.handle_get,
-        }
-
-    def handle_get(self, _event: BaseEvent) -> Response:
-        return Response(status_code=200, body="GET request handled")
+from tests.fakes import FakeTestController
 
 
 def test_base_controller_with_no_routes():
@@ -32,7 +23,7 @@ def test_base_controller_with_no_routes():
 
 
 def test_base_controller_with_registered_route():
-    controller = TestController()
+    controller = FakeTestController()
     event = BaseEvent(
         resource="/test",
         http_method="GET",  # type: ignore[call-arg]
