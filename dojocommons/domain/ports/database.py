@@ -1,0 +1,6 @@
+from typing import Any, Protocol
+
+
+class Database(Protocol):
+    def execute(self, query: str, params: tuple | None = None) -> Any: ...
+    def close(self) -> None: ...

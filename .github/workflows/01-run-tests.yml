@@ -21,14 +21,24 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+      - name: Atualizar pip
+        run: python -m pip install --upgrade pip
+      - name: Instalar uv
+        run: python -m pip install --upgrade pip && pip install uv
+      - name: 💾 Instalar dependências Python do build
+        run: uv sync --no-dev
+
+      - name: Instalar dependências de teste
+        run: uv sync --group test
 
       # Executar os testes
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          python -m unittest discover -s tests -p "*.py"
+          uv run pytest tests/ \
+          --junitxml=test-results.xml \
+          --cov=dojocommons \
+          --cov-report=xml \
+          --cov-report=term \
+          --cov-fail-under=80
