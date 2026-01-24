@@ -1,7 +1,7 @@
 from dojocommons.application.use_cases.get_entity_use_case import (
     GetEntityUseCase,
 )
-from tests.conftest import FakeEntity
+from tests.fakes import FakeEntity
 
 
 def test_get_entity_use_case(mocker):

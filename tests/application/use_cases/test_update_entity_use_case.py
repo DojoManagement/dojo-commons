@@ -4,7 +4,7 @@ from dojocommons.application.use_cases.update_entity_use_case import (
     UpdateEntityUseCase,
 )
 from dojocommons.domain.exceptions.business_exception import BusinessError
-from tests.conftest import FakeEntity
+from tests.fakes import FakeEntity
 
 
 def test_update_entity_use_case(mocker):
