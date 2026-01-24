@@ -9,7 +9,6 @@ from dojocommons.interface_adapters.dtos.response import Response
 
 class TestController(BaseController):
     def __init__(self):
-        super().__init__()
         self._routes = {
             HTTPMethod.GET: self.handle_get,
         }

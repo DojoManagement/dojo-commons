@@ -1,10 +1,10 @@
 import uuid
 
 import pytest
-from dojocommons.infrastructure.persistence.duckdb_repository import (
+
+from dojocommons.infrastructure.repositories.duckdb_repository import (
     DuckDBRepository,
 )
-
 from tests.fakes import FakeEntity
 
 
