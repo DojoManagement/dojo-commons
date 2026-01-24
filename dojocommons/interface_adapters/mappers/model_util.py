@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class ModelUtil:
     @staticmethod
-    def pydantic_type_to_sql(py_type: type[BaseModel] | None) -> str:
+    def pydantic_type_to_sql(py_type: type | None) -> str:
         """
         Converte tipos Pydantic para tipos SQL.
         :param py_type: Tipo Pydantic a ser convertido.
