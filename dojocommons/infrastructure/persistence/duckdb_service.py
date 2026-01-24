@@ -1,11 +1,11 @@
 from typing import Any
 
 import duckdb
-from dojocommons.infrastructure.logging.logger import logger
 
 from dojocommons.infrastructure.config.app_configuration import (
     AppConfiguration,
 )
+from dojocommons.infrastructure.logging.logger import logger
 
 
 class DuckDbService:
