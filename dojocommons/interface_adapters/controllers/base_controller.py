@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
-from dojocommons.domain.entities.base_event import BaseEvent
-from dojocommons.domain.entities.response import Response
+from dojocommons.interface_adapters.dtos.base_event import BaseEvent
+from dojocommons.interface_adapters.dtos.response import Response
 
 if TYPE_CHECKING:
     from collections.abc import Callable
