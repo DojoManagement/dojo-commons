@@ -75,7 +75,7 @@ ignore = [
 
 per-file-ignores = {
     "**/tests/**/*.py" = [
-        "D", "S101"
+        "D", "S101", "SLF001", "S608"
     ],  # Ignore docstring and security issues in tests}
 }
 
