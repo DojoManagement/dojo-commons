@@ -15,5 +15,7 @@ class AppConfiguration(BaseSettings):
     def s3_file_path(self) -> str:
         return f"s3://{self.s3_bucket}/{self.s3_path}"
 
-    class Config:
-        env_file = ".env"
+    model_config = {
+        "env_file": ".env",
+        "extra": "ignore",
+    }
