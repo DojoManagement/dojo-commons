@@ -137,7 +137,7 @@ def test_find_all_with_filters(repo, db_mock):
     )
 
     # Verifica se o retorno foi convertido em entidades
-    assert len(result) == 2
+    assert len(result) == 2  # noqa: PLR2004
     assert result[0].id == "1"
     assert result[0].name == "Rodrigo"
 
