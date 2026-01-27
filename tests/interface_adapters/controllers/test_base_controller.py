@@ -8,8 +8,8 @@ from dojocommons.interface_adapters.dtos.response import Response
 from tests.fakes import FakeTestController
 
 
-def test_base_controller_with_no_routes():
-    controller = BaseController()
+def test_base_controller_with_no_routes(presenter):
+    controller = BaseController(presenter)
     event = BaseEvent(
         resource="/test",
         http_method="GET",  # type: ignore[call-arg]
@@ -17,9 +17,11 @@ def test_base_controller_with_no_routes():
 
     response = controller.dispatch(event)
 
-    assert isinstance(response, Response)
-    assert response.status_code == HTTPStatus.METHOD_NOT_ALLOWED
-    assert response.body == "Method Not Allowed"
+    assert response == presenter.present_error.return_value
+    presenter.present_error.assert_called_once_with(
+        code=HTTPStatus.METHOD_NOT_ALLOWED,
+        message="Método não permitido",
+    )
 
 
 def test_base_controller_with_registered_route():

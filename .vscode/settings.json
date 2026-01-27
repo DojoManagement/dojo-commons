@@ -7,6 +7,17 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder:dojo-commons}",
     ],
+    "python.analysis.exclude": [
+        "**/__pycache__",
+        "**/.pytest_cache/**",
+        "**/.mypy_cache/**",
+        "**/build/**",
+        "**/dist/**"
+    ],
+    "python.analysis.typeChekingMode": "standard",
+    "python.analysis.userFileIndexingLimit": 20000,
+    "python.analysis.indexing": true,
+    "python.analysis.autoImportCompletions": true,
     "python.envFile": "${workspaceFolder:dojo-commons}/.env",
     "python.terminal.activateEnvironment": true,
     // "python.defaultInterpreterPath": "${workspaceFolder:dojo-commons}/.venv/bin/python",
@@ -47,11 +58,14 @@
         "**/__pycache__": true,
         "**/.pytest_cache": true,
         "**/.mypy_cache": true,
-        "**/.venv": true
+        "**/.venv": false
     },
     "files.watcherExclude": {
-        "**/.venv/**": true,
         "**/.mypy_cache/**": true,
-        "**/.pytest_cache/**": true
-    }
+        "**/.pytest_cache/**": true,
+        "**/.venv/**": false
+    },
+    "files.watcherInclude": [
+        "**/.venv/**"
+    ]
 }
