@@ -20,18 +20,21 @@ from dojocommons.interface_adapters.controllers.base_controller import (
 )
 from dojocommons.interface_adapters.dtos.base_event import BaseEvent
 from dojocommons.interface_adapters.dtos.response import Response
+from dojocommons.interface_adapters.presenters.base import EntityPresenter
 
 
 class EntityController(BaseController):
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         list_use_case: ListEntitiesUseCase,
         get_use_case: GetEntityUseCase,
         delete_use_case: DeleteEntityUseCase,
         update_use_case: UpdateEntityUseCase,
         create_use_case: CreateEntityUseCase,
+        presenter: EntityPresenter,
     ):
-        super().__init__()
+        super().__init__(presenter)
+
         self._list_use_case = list_use_case
         self._get_use_case = get_use_case
         self._delete_use_case = delete_use_case
@@ -43,6 +46,7 @@ class EntityController(BaseController):
             HTTPMethod.POST: self._handle_post,
             HTTPMethod.PUT: self._handle_put,
             HTTPMethod.DELETE: self._handle_delete,
+            HTTPMethod.OPTIONS: self._handle_options,
         }
 
     def _handle_get(self, event: BaseEvent) -> Response:
@@ -61,23 +65,23 @@ class EntityController(BaseController):
         entity_id = event.path_parameters["id"]  # type: ignore[arg-type]
         entity = self._get_use_case.execute(entity_id)
         if entity is None:
-            return Response(
-                status_code=404,
-                body=f"ID {entity_id} não encontrado.",
+            return self._presenter.present_error(
+                code=404, message=f"ID {entity_id} não encontrado."
             )
-        return Response(status_code=200, body=entity)
+
+        return self._presenter.present(entity)
 
     def _handle_list(self, event: BaseEvent) -> Response:
         filters = event.query_parameters or {}
         entities = self._list_use_case.execute(filters)
-        return Response(status_code=200, body=entities)
+        return self._presenter.present(entities)
 
     def _handle_post(self, event: BaseEvent) -> Response:
         if missing := self._require_body(event):
             return missing
 
         result = self._create_use_case.execute(event)
-        return Response(status_code=201, body=result)
+        return self._presenter.present(result, code=201)
 
     def _handle_put(self, event: BaseEvent) -> Response:
         if missing := self._require_id(event):
@@ -89,11 +93,10 @@ class EntityController(BaseController):
         dto = event.model_dump()
         result = self._update_use_case.execute(entity_id, dto)
         if result is None:
-            return Response(
-                status_code=404,
-                body=f"ID {entity_id} não encontrado.",
+            return self._presenter.present_error(
+                code=404, message=f"ID {entity_id} não encontrado."
             )
-        return Response(status_code=200, body=result)
+        return self._presenter.present(result)
 
     def _handle_delete(self, event: BaseEvent) -> Response:
         if missing := self._require_id(event):
@@ -101,23 +104,24 @@ class EntityController(BaseController):
 
         entity_id = event.path_parameters["id"]  # type: ignore[arg-type]
         self._delete_use_case.execute(entity_id)
-        return Response(status_code=204, body=None)
+        return self._presenter.present(None, code=204)
 
     def _require_id(self, event: BaseEvent) -> Response | None:
         if not event.path_parameters or "id" not in event.path_parameters:
-            return Response(
-                status_code=400,
-                body=f"ID é obrigatório para {event.resource}.",
+            return self._presenter.present_error(
+                code=400,
+                message=f"ID é obrigatório para {event.resource}.",
             )
         return None
 
     def _require_body(self, event: BaseEvent) -> Response | None:
         if event.body is None:
-            msg = (
-                "Corpo da requisição é obrigatório para {self._resource_name}."
-            )
-            return Response(status_code=400, body=msg)
+            msg = f"Corpo da requisição é obrigatório para {event.resource}."
+            return self._presenter.present_error(code=400, message=msg)
         return None
 
     def _resource_has_id(self, event: BaseEvent) -> bool:
         return "{id}" in event.resource
+
+    def _handle_options(self, _event: BaseEvent) -> Response:
+        return self._presenter.present({})

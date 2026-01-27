@@ -3,6 +3,21 @@ from http import HTTPMethod
 
 import pytest
 
+from dojocommons.application.use_cases.create_entity_use_case import (
+    CreateEntityUseCase,
+)
+from dojocommons.application.use_cases.delete_entity_use_case import (
+    DeleteEntityUseCase,
+)
+from dojocommons.application.use_cases.get_entity_use_case import (
+    GetEntityUseCase,
+)
+from dojocommons.application.use_cases.list_entities_use_case import (
+    ListEntitiesUseCase,
+)
+from dojocommons.application.use_cases.update_entity_use_case import (
+    UpdateEntityUseCase,
+)
 from dojocommons.infrastructure.repositories.duckdb_repository import (
     DuckDBRepository,
 )
@@ -10,6 +25,7 @@ from dojocommons.interface_adapters.controllers.entity_controller import (
     EntityController,
 )
 from dojocommons.interface_adapters.dtos.base_event import BaseEvent
+from dojocommons.interface_adapters.presenters.base import EntityPresenter
 from tests.fakes import FakeEntity
 
 
@@ -47,20 +63,26 @@ def repo(db_mock, tmp_path):
 @pytest.fixture
 def use_cases(mocker):
     return {
-        "list": mocker.Mock(),
-        "get": mocker.Mock(),
-        "delete": mocker.Mock(),
-        "update": mocker.Mock(),
-        "create": mocker.Mock(),
+        "list": mocker.Mock(spec=ListEntitiesUseCase),
+        "get": mocker.Mock(spec=GetEntityUseCase),
+        "delete": mocker.Mock(spec=DeleteEntityUseCase),
+        "update": mocker.Mock(spec=UpdateEntityUseCase),
+        "create": mocker.Mock(spec=CreateEntityUseCase),
     }
 
 
 @pytest.fixture
-def controller(use_cases):
+def presenter(mocker):
+    return mocker.Mock(spec=EntityPresenter)
+
+
+@pytest.fixture
+def controller(use_cases, presenter):
     return EntityController(
         list_use_case=use_cases["list"],
         get_use_case=use_cases["get"],
         delete_use_case=use_cases["delete"],
         update_use_case=use_cases["update"],
         create_use_case=use_cases["create"],
+        presenter=presenter,
     )
