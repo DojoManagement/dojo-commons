@@ -92,8 +92,9 @@ class DuckDBRepository[T: BaseEntity](Repository[T]):
 
         return self._model_class.model_validate(row_dict)
 
-    def find_all(self, **filters) -> list[T]:
+    def find_all(self, order_by: str | None = None, **filters) -> list[T]:
         query = f"SELECT * FROM {self._table_name}"  # noqa: S608
+        values = None
 
         if filters:
             self._validate_column_names(filters.keys())
@@ -101,6 +102,11 @@ class DuckDBRepository[T: BaseEntity](Repository[T]):
             where = " AND ".join([f"{key} = ?" for key in filters])
             query += " WHERE " + where
             values = tuple(filters.values())
+
+        if order_by:
+            query += " ORDER BY " + order_by
+
+        if values is not None:
             cursor = self._db.execute(query, values)
         else:
             cursor = self._db.execute(query)
