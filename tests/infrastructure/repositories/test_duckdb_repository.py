@@ -142,6 +142,26 @@ def test_find_all_with_filters(repo, db_mock):
     assert result[0].name == "Rodrigo"
 
 
+def test_find_all_with_order_by(repo, db_mock):
+    db_mock.execute.return_value.fetchall.return_value = [
+        ("1", "Rodrigo"),
+        ("2", "Maria"),
+    ]
+    db_mock.execute.return_value.description = [("id",), ("name",)]
+
+    # Act
+    result = repo.find_all(order_by="name", name="Rodrigo")
+
+    db_mock.execute.assert_called_with(
+        "SELECT * FROM fake_table WHERE name = ? ORDER BY name", ("Rodrigo",)
+    )
+
+    assert result == [
+        FakeEntity(id="1", name="Rodrigo"),
+        FakeEntity(id="2", name="Maria"),
+    ]
+
+
 def test_find_all_invalid_column(repo):
     with pytest.raises(ValueError):
         repo.find_all(**{"invalid-column!": "x"})
