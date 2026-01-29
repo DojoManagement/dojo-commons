@@ -88,9 +88,8 @@ class DuckDBRepository[T: BaseEntity](Repository[T]):
             return None
 
         column_names = [desc[0] for desc in cursor.description]
-        row_dict = dict(zip(column_names, row, strict=False))
 
-        return self._model_class.model_validate(row_dict)
+        return self._build_model(column_names, row)
 
     def find_all(self, order_by: str | None = None, **filters) -> list[T]:
         query = f"SELECT * FROM {self._table_name}"  # noqa: S608
@@ -116,12 +115,12 @@ class DuckDBRepository[T: BaseEntity](Repository[T]):
             return []
 
         column_names = [desc[0] for desc in cursor.description]
-        return [
-            self._model_class.model_validate(
-                dict(zip(column_names, row, strict=False))
-            )
-            for row in rows
-        ]
+        return [self._build_model(column_names, row) for row in rows]
+
+    def _build_model(self, column_names: list[str], row: Iterable[Any]) -> T:
+        return self._model_class.model_validate(
+            dict(zip(column_names, row, strict=False))
+        )
 
     def _validate_column_names(self, column_names: Iterable[str]) -> None:
         for column in column_names:
